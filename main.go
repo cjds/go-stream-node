@@ -2,27 +2,24 @@ package main
 
 //go:generate gengo msg power_msgs/BatteryState
 import (
-        "fmt"
-        "github.com/akio/rosgo/ros"
-        "os"
-        "power_msgs"
+	"fmt"
+       	"time"
+	"power_msgs"
+	"github.com/patrickmn/go-cache"
+	//log "github.com/sirupsen/logrus"
 )
         
-func callback(msg *power_msgs.BatteryState) {
-        fmt.Println("Name:", msg.Name)
-        fmt.Println("Charge_level", msg.ChargeLevel)
-        fmt.Println("is_charging", msg.IsCharging)
-        fmt.Println("remaining_time", msg.RemainingTime)
-}
 
 func main() {
-        node, err := ros.NewNode("/listener", os.Args)
-        if err != nil {
-                fmt.Println(err)
-                os.Exit(-1)
-        }
-        defer node.Shutdown()
-        node.Logger().SetSeverity(ros.LogLevelDebug)
-        node.NewSubscriber("/chatter", power_msgs.MsgBatteryState, callback)
-        node.Spin()
+	c := cache.New(5*time.Minute, 10*time.Minute)
+	c.Set("token", 55555, cache.NoExpiration)
+
+	topics := []string{"chatter"}
+	ch := make(chan *power_msgs.BatteryState,10)
+	
+	NewSubscriber(topics,ch)
+	for{
+		msg := <- ch
+		fmt.Println(msg)
+	}
 }
