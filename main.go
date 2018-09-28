@@ -3,7 +3,7 @@ package main
 //go:generate gengo msg power_msgs/BatteryState
 //go:generate gengo msg std_msgs/String
 import (
-       	"time"
+	"time"
 
 	"github.com/patrickmn/go-cache"
 	"github.com/sirupsen/logrus"
