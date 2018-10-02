@@ -4,71 +4,77 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"power_msgs"
-	
-	"github.com/sirupsen/logrus"
+	"std_msgs"
+
 	"github.com/akio/rosgo/ros"
 	"github.com/patrickmn/go-cache"
+	"github.com/sirupsen/logrus"
 )
 
-// Subscribe to topics and reads data
-type Subscribe struct {
-	Topics	[]string
-	Write	chan *power_msgs.BatteryState
-	Stop	chan bool
-	Store	*cache.Cache
+// Subscribe to topics and read data
+type SubscriberManager struct {
+	Topics []string
+	Stop   chan bool
+	Store  *cache.Cache
 }
 
 // Create a new subscriber and return it
-func NewSubscriber(store *cache.Cache) *Subscribe {
+func NewSubscriber(store *cache.Cache) *SubscriberManager {
 	logrus.Info("[Subscribe] New subscriber called")
-	sc := &Subscribe{
-		Topics:	make([] string, 5),
-		Write: 	make(chan *power_msgs.BatteryState),
-		Stop:	make(chan bool),
-		Store:	store,
+	sm := &SubscriberManager{
+		Topics: make([]string, 5),
+		Stop:   make(chan bool),
+		Store:  store,
 	}
-	return sc
+	return sm
 }
 
-// Create new listener. TODO: divide listener and subscriber 
-// into different methods
-func (sc *Subscribe) newListener(){
-	logrus.Info("[Subscribe] New Listener created")
+func (sm *SubscriberManager) newNode() ros.Node {
 	node, err := ros.NewNode("/listener", os.Args)
 	if err != nil {
 		logrus.Info(err)
 		os.Exit(-1)
 	}
-	defer node.Shutdown()
-	node.Logger().SetSeverity(ros.LogLevelDebug)
-	node.NewSubscriber("/chatter", power_msgs.MsgBatteryState, (*sc).readData)
-	node.Spin()
+	return node
+}
+
+// Create new listener. TODO: divide listener and subscriber
+// into different methods
+func (sm *SubscriberManager) newListener(topic string, msgType ros.MessageType, n ros.Node) {
+	n.Logger().SetSeverity(ros.LogLevelDebug)
+	n.NewSubscriber("/"+topic, msgType, (*sm).readData)
+	n.Spin()
+
+	(*sm).Topics = append((*sm).Topics, topic)
+	logrus.Info("[Subscribe] New Listener created")
 }
 
 // Read data and check for token in cache before sending data
-func (sc *Subscribe) readData(msg *power_msgs.BatteryState){
-	logrus.Info("[Subscribe] Name:", msg.Name)
-	logrus.Info("[Subscribe] Charge_level:", msg.ChargeLevel)
-	logrus.Info("[Subscribe] is_charging:", msg.IsCharging)
-	logrus.Info("[Subscribe] remaining_time:", msg.RemainingTime)
-	t, found := (*sc).Store.Get("token")
+func (sm *SubscriberManager) readData(msg interface{}) {
+	switch msg.(type) {
+	case *power_msgs.BatteryState:
+		m := msg.(*power_msgs.BatteryState)
+		logrus.Info("[Subscribe] Name:", m.Name)
+	case *std_msgs.String:
+		m := msg.(*std_msgs.String)
+		logrus.Info("[Subscribe] String Message:", m)
+	default:
+		logrus.Info("[Subscribe] Unsupported message type")
+	}
+}
+
+//A go routine to connect to websocket server
+func connect() {
+
+}
+
+func (sm *SubscriberManager) checkToken() {
+	t, found := (*sm).Store.Get("token")
 	if found {
 		logrus.Info("[Subscribe] Found a token in cache")
 		logrus.Info("[Subscribe] Token is:", t)
 		//Todo send data async via socket
 	}
 }
-
-// Add topics to Topics value in the struct
-func (sc *Subscribe) addTopic(t string){
-	(*sc).Topics = append((*sc).Topics, t)
-}
-
-// Print all the topics in struct
-func (sc *Subscribe) printAllTopics(){
-	fmt.Println((*sc).Topics)
-}
-
