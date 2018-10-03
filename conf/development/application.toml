@@ -1,0 +1,15 @@
+version = "development"
+
+[auth]
+username =             "freight20"
+password =             "fr-3538323734355101002e0022"
+grant_type =           "http://auth0.com/oauth/grant-type/password-realm"
+scope =                "profile email fetchcore:all_access openid offline_access"
+audience =             "fetchcore"
+client_id =            "efPjIzZrsTq2XDZSBAS8kbbEbo2ptQZj"
+client_secret =        "g9CjGEqON0k-xiBFCRl7BGCGdNjgVwFPIVmsCLUm0dykPUvawhhCVhXDYjaKC1F9"
+realm =                "dev"
+auth_url =             "https://hello-there.auth0.com"
+use_deprecated_login = false
+max_retries =          3
+on_success_wait =         10 //minutes

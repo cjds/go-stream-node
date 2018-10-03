@@ -4,13 +4,15 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"power_msgs"
 	"std_msgs"
 
-	"github.com/akio/rosgo/ros"
+	//"github.com/gorilla/websocket"
 	"github.com/patrickmn/go-cache"
 	"github.com/sirupsen/logrus"
+	"github.com/akio/rosgo/ros"
 )
 
 // Subscribe to topics and read data
@@ -31,17 +33,16 @@ func NewSubscriber(store *cache.Cache) *SubscriberManager {
 	return sm
 }
 
-func (sm *SubscriberManager) newNode() ros.Node {
+// Create new node and return
+func (sm *SubscriberManager) newNode() (ros.Node, error) {
 	node, err := ros.NewNode("/listener", os.Args)
 	if err != nil {
 		logrus.Info(err)
-		os.Exit(-1)
 	}
-	return node
+	return node, err
 }
 
-// Create new listener. TODO: divide listener and subscriber
-// into different methods
+// Create new listener.
 func (sm *SubscriberManager) newListener(topic string, msgType ros.MessageType, n ros.Node) {
 	n.Logger().SetSeverity(ros.LogLevelDebug)
 	n.NewSubscriber("/"+topic, msgType, (*sm).readData)
@@ -65,16 +66,16 @@ func (sm *SubscriberManager) readData(msg interface{}) {
 	}
 }
 
-//A go routine to connect to websocket server
+// A go routine to connect to websocket server
 func connect() {
 
 }
 
-func (sm *SubscriberManager) checkToken() {
+// Check for token in cache
+func (sm *SubscriberManager) checkToken() (string, error) {
 	t, found := (*sm).Store.Get("token")
-	if found {
-		logrus.Info("[Subscribe] Found a token in cache")
-		logrus.Info("[Subscribe] Token is:", t)
-		//Todo send data async via socket
+	if !found {
+		return "", fmt.Errorf("Token not found in cache")
 	}
+	return t.(string), nil
 }
