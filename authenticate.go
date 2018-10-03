@@ -17,19 +17,19 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Authenticate struct that fetches token and sets in cache
+// Authenticate struct that fetches token and sets in cache.
 type AuthManager struct {
 	Store   *cache.Cache
 	Connect chan Connect
 }
 
-// Connect struct to manage the connection status and errors
+// Connect struct to manage the connection status and errors.
 type Connect struct {
 	Connected bool
 	Err       error
 }
 
-// Create new AuthManager that takes cache as parameter
+// Create new AuthManager that takes cache as parameter.
 func NewAuthManager(store *cache.Cache) *AuthManager {
 	logrus.Info("[Auth] NewAuthManager called")
 	auth := &AuthManager{
@@ -39,7 +39,7 @@ func NewAuthManager(store *cache.Cache) *AuthManager {
 	return auth
 }
 
-// Set fetched token from server in cache
+// Set fetched token from server in cache.
 func (auth *AuthManager) setTokenInCache() {
 	retries := 0
 	maxRetries := viper.GetInt("auth.max_retries")
@@ -62,27 +62,27 @@ func (auth *AuthManager) setTokenInCache() {
 				Connected: true,
 				Err:       nil,
 			}
-			logrus.Info("[Auth] Succesfully received token")
+			logrus.Info("[Auth] Succesfully received token.")
 			retries = 0
 			time.Sleep(onSuccessWait * time.Minute)
 		}
 	}
 
-	//Send error message through channel after maximum retries
+	//Send error message through channel after maximum retries.
 	(*auth).Connect <- Connect{
 		Connected: false,
 		Err:       err,
 	}
 }
 
-// Calculate wait time and return duration
+// Calculate wait time and return duration.
 func calcWaitTime(retries int) time.Duration {
 	r := float64(retries)
 	retries = int(math.Pow(2, r))
 	return time.Duration(retries) * time.Second
 }
 
-// Load configeration from application.toml file
+// Load configeration from application.toml file.
 func loadConfig() ([]byte, error) {
 	p, err := json.Marshal(map[string]string{
 		"username":      viper.GetString("auth.username"),

@@ -15,14 +15,14 @@ import (
 	"github.com/akio/rosgo/ros"
 )
 
-// Subscribe to topics and read data
+// Subscribe to topics and read data.
 type SubscriberManager struct {
 	Topics []string
 	Stop   chan bool
 	Store  *cache.Cache
 }
 
-// Create a new subscriber and return it
+// Create a new subscriber and return it.
 func NewSubscriber(store *cache.Cache) *SubscriberManager {
 	logrus.Info("[Subscribe] New subscriber called")
 	sm := &SubscriberManager{
@@ -33,7 +33,7 @@ func NewSubscriber(store *cache.Cache) *SubscriberManager {
 	return sm
 }
 
-// Create new node and return
+// Create new node and return it.
 func (sm *SubscriberManager) newNode() (ros.Node, error) {
 	node, err := ros.NewNode("/listener", os.Args)
 	if err != nil {
@@ -52,7 +52,7 @@ func (sm *SubscriberManager) newListener(topic string, msgType ros.MessageType, 
 	logrus.Info("[Subscribe] New Listener created")
 }
 
-// Read data and check for token in cache before sending data
+// Read data and check for token in cache before sending data.
 func (sm *SubscriberManager) readData(msg interface{}) {
 	switch msg.(type) {
 	case *power_msgs.BatteryState:
@@ -66,12 +66,12 @@ func (sm *SubscriberManager) readData(msg interface{}) {
 	}
 }
 
-// A go routine to connect to websocket server
+// A go routine to connect to websocket server.
 func connect() {
 
 }
 
-// Check for token in cache
+// Check for token in cache.
 func (sm *SubscriberManager) checkToken() (string, error) {
 	t, found := (*sm).Store.Get("token")
 	if !found {
