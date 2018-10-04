@@ -54,6 +54,7 @@ func main() {
 		logrus.Fatal(err)
 	}
 	defer n.Shutdown()
+
 	go s.newListener("chatteone", std_msgs.MsgString, n)
 	go s.newListener("chattertwo", power_msgs.MsgBatteryState, n)
 
