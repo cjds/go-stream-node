@@ -19,22 +19,21 @@ import (
 
 // Authenticate struct that fetches token and sets in cache.
 type AuthManager struct {
-	Store   *cache.Cache
-	Connect chan Connect
+	Store      *cache.Cache
+	AuthStatus chan AuthStatus
 }
 
 // Connect struct to manage the connection status and errors.
-type Connect struct {
+type AuthStatus struct {
 	Connected bool
 	Err       error
 }
 
 // Create new AuthManager that takes cache as parameter.
 func NewAuthManager(store *cache.Cache) *AuthManager {
-	logrus.Info("[Auth] NewAuthManager called")
 	auth := &AuthManager{
-		Store:   store,
-		Connect: make(chan Connect),
+		Store:      store,
+		AuthStatus: make(chan AuthStatus),
 	}
 	return auth
 }
@@ -58,7 +57,7 @@ func (auth *AuthManager) setTokenInCache() {
 			time.Sleep(waitTime)
 		} else {
 			(*auth).Store.Set("token", t, cache.DefaultExpiration)
-			(*auth).Connect <- Connect{
+			auth.AuthStatus <- AuthStatus{
 				Connected: true,
 				Err:       nil,
 			}
@@ -69,7 +68,7 @@ func (auth *AuthManager) setTokenInCache() {
 	}
 
 	//Send error message through channel after maximum retries.
-	(*auth).Connect <- Connect{
+	auth.AuthStatus <- AuthStatus{
 		Connected: false,
 		Err:       err,
 	}
@@ -99,7 +98,10 @@ func loadConfig() ([]byte, error) {
 
 // Acquire token from auth0 server and return it.
 func (auth *AuthManager) getTokenFromServer() (string, error) {
-	return "testtoken", nil
+	authEnabled := viper.GetBool("auth.enabled")
+	if !authEnabled {
+		return "testtoken", nil
+	}
 
 	p, err := loadConfig()
 	if err != nil {
@@ -118,6 +120,8 @@ func (auth *AuthManager) getTokenFromServer() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("Error sending request: %+v", err)
 	}
+
+	req.Close = true
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("Server responded with an error: %+v", resp.Status)

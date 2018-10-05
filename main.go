@@ -13,6 +13,7 @@ import (
 	"std_msgs"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/patrickmn/go-cache"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -37,30 +38,33 @@ func main() {
 		logrus.Errorf("Config file not found: %s \n", err)
 	}
 
-	c := cache.New(1*time.Hour, 2*time.Hour)
+	id := viper.GetString("auth.username")
+	st := cache.New(1*time.Hour, 2*time.Hour)
+	var conn *websocket.Conn
 
-	a := NewAuthManager(c)
+	a := NewAuthManager(st)
 	go a.setTokenInCache()
 
-	t := <-a.Connect
-	if !t.Connected {
-		logrus.Error(t.Err)
+	as := <-a.AuthStatus
+	if !as.Connected {
+		logrus.Error(as.Err)
 		logrus.Fatal("Reached maximum number of retries.")
 	}
 
-	s := NewSubscriber(c)
+	s := NewSubscriber(id, st, conn)
 	n, err := s.newNode()
 	if err != nil {
 		logrus.Fatal(err)
 	}
+
 	defer n.Shutdown()
 
-	go s.newListener("chatteone", std_msgs.MsgString, n)
-	go s.newListener("chattertwo", power_msgs.MsgBatteryState, n)
+	go s.newListener("string", std_msgs.MsgString, n)
+	go s.newListener("battery", power_msgs.MsgBatteryState, n)
 
-	for t := range a.Connect {
-		if !t.Connected {
-			logrus.Error(t.Err)
+	for as = range a.AuthStatus {
+		if !as.Connected {
+			logrus.Error(as.Err)
 			logrus.Fatal("Reached maximum number of retries.")
 		}
 	}

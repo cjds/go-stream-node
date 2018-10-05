@@ -1,6 +1,7 @@
 version = "development"
 
-[auth]       
+[auth]
+enabled              = false
 username             = "freight20"
 password             = "fr-3538323734355101002e0022"
 grant_type           = "http://auth0.com/oauth/grant-type/password-realm"

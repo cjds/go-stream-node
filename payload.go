@@ -12,14 +12,19 @@ type Message struct {
 
 // Payload defines the data format for data coming from stream consumer and stream producer.
 type Payload struct {
-	StreamURL  string       `json:"stream"`
-	Customer   string       `json:"customer"`
-	ProducerID string       `json:"producer"`
-	Data       *BatteryData `json:"data"`
+	StreamURL  string      `json:"stream"`
+	Customer   string      `json:"customer"`
+	ProducerID string      `json:"producer"`
+	Data       interface{} `json:"data"`
 }
 
 // BatteryData defines the data format for battery data.
 type BatteryData struct {
-	Timestamp int     `json:"timestamp"`
+	Timestamp int64   `json:"timestamp"`
 	Percent   float32 `json:"percent"`
+}
+
+type StringData struct {
+	Timestamp int64  `json:"timestamp"`
+	Message   string `json:"message"`
 }
