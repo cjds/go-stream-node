@@ -1,5 +1,5 @@
-# GO Stream Node
-A ROS streams node built in GO that streams data to streams server. Data can be published to various channels and the stream node publishes it to the streams server which is eventually stored in Cassandra database.
+# GO Stream Node (WIP)
+A ROS streams node built in GO that streams data to streams server. Data can be published to various channels and the stream node publishes it to the streams server which is eventually stored in Cassandra database. This a work in progress project and more updates will be added.
 
 ## Getting Started
 ### Installing Dependencies
@@ -21,13 +21,16 @@ Now, run the following command to start the stream node server. Be sure to chang
 ```
 go install && go-stream-server
 ```
-To add new listeners, following format can be used `main.go`. This will add additional listeners to the stream node.
+To add new listeners, following format can be used in `main.go` which will add new stream type to `streams` map. This will add additional listeners to the stream node.
 ```
-go s.newListener(<TopicName>, <MessageType>, <RosNode>)
+streams := map[string]ros.MessageType{
+                "<TopicName>":<MessageType>}
 ```
 For example we can add new listener in the following way
 ```
-go s.newListener("string", std_msgs.MsgString, n)
+streams := map[string]ros.MessageType{
+		"string":  std_msgs.MsgString,
+		"battery": power_msgs.MsgBatteryState}
 ```
 To send messages from your host machine to go stream node use following format. Make sure that `roscore` is up and running before running `rostopic` to send messages.
 ```
@@ -41,4 +44,3 @@ Do note that `std_msgs/String` type data is not supported on streams server. Hen
 
 ### Configurations
 Changing auth0 credentials and streams server's properties can be done by editing the `application.toml` file in `conf/development` directory.
-

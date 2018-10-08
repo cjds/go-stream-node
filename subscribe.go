@@ -41,31 +41,24 @@ var MsgMap = map[ros.MessageType]string{
 
 // Subscribe to topics and read data.
 type SubscriberManager struct {
-	ID        string
-	Store     *cache.Cache
-	Conn      *websocket.Conn
-	Connected bool
-	Send      chan []byte
-	Streams   []string
-	Stop      chan bool
-	AddStream chan string
+	ID      string
+	Store   *cache.Cache
+	Conn    *websocket.Conn
+	Streams map[string]ros.MessageType
+	Send    chan []byte
+	Stop    chan bool
 }
 
 // Create a new subscriber and return it.
-func NewSubscriber(id string, store *cache.Cache, conn *websocket.Conn) *SubscriberManager {
+func NewSubscriber(id string, store *cache.Cache, conn *websocket.Conn, streams map[string]ros.MessageType) *SubscriberManager {
 	sm := &SubscriberManager{
-		ID:        id,
-		Store:     store,
-		Conn:      conn,
-		Connected: false,
-		Send:      make(chan []byte, 5),
-		Streams:   make([]string, 0),
-		Stop:      make(chan bool),
-		AddStream: make(chan string),
+		ID:      id,
+		Store:   store,
+		Conn:    conn,
+		Streams: streams,
+		Send:    make(chan []byte, 5),
+		Stop:    make(chan bool),
 	}
-	go sm.connectToSocket()
-	go sm.readPump()
-	go sm.writePump()
 	return sm
 }
 
@@ -74,21 +67,30 @@ func (sm *SubscriberManager) newNode() (ros.Node, error) {
 	node, err := ros.NewNode("/listener", os.Args)
 	if err != nil {
 		logrus.Info(err)
+		return nil, err
 	}
+	sm.connectToSocket()
+	go sm.readPump()
+	go sm.writePump()
+	sm.createNewListeners(node)
 	return node, err
+}
+
+// Create new listeners for all streams in streams map.
+func (sm *SubscriberManager) createNewListeners(n ros.Node) {
+	for k, v := range sm.Streams {
+		go sm.newListener(k, v, n)
+	}
 }
 
 // Create new listener.
 func (sm *SubscriberManager) newListener(topic string, msgType ros.MessageType, n ros.Node) {
 	n.Logger().SetSeverity(ros.LogLevelDebug)
 	n.NewSubscriber("/"+topic, msgType, sm.readData)
-	sm.Streams = append(sm.Streams, MsgMap[msgType])
-	sm.AddStream <- MsgMap[msgType]
 	n.Spin()
 }
 
 // Read data and check for token in cache before sending data.
-// TODO: Constants for streamURLS
 func (sm *SubscriberManager) readData(msg interface{}) {
 	payload := Payload{}
 
@@ -125,29 +127,35 @@ func (sm *SubscriberManager) readData(msg interface{}) {
 	sm.Send <- m
 }
 
-// TODO: Resolve race condition.
-// Race condition exists when sm.Connected is not used
-// to check the websocket connection status.
+// Read responses from websocket.
+// This is essential for maintaining the websocket connection when
+// there is no data being tranferred and also for checking unexpected
+// closure of socket connection by streams server.
 func (sm *SubscriberManager) readPump() {
+	sm.Conn.SetReadLimit(maxMessageSize)
+	sm.Conn.SetReadDeadline(time.Now().Add(pongWait))
+	sm.Conn.SetPongHandler(func(string) error {
+		sm.Conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+
 	for {
-		if sm.Connected {
-			_, _, err := sm.Conn.ReadMessage()
-			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-					logrus.Fatal("Websocket has unexpectedly closed: ", err)
-				}
-				logrus.Warn("[Subscribe] Websocket reading error:", err)
+		_, _, err := sm.Conn.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+				logrus.Fatal("Websocket has unexpectedly closed: ", err)
 			}
+			logrus.Warn("[Subscribe] Websocket reading error:", err)
 		}
 	}
 }
 
-// Race condition exists when sm.Connected is not used
-// to check the websocket connection status.
+// Upstream payload data through socket.
+// Ticker is used to ping streams server and is essential to
+// maintain the websocket connection when no data is being sent.
 func (sm *SubscriberManager) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer ticker.Stop()
-
 	for {
 		select {
 		case message := <-sm.Send:
@@ -166,41 +174,22 @@ func (sm *SubscriberManager) writePump() {
 	}
 }
 
-// A go routine to connect to websocket server when new streams are added.
+// Connect to websocket with all subscribed streams as URL params.
 func (sm *SubscriberManager) connectToSocket() {
 	s := sm.getWebsocketURL()
 	u, _ := url.Parse(s)
-
 	var err error
-	defer sm.Conn.Close()
 
-	for range sm.AddStream {
-		if sm.Connected {
-			logrus.Info("[Subscribe] Closing socket connection to add more streams")
-			sm.Conn.WriteMessage(websocket.CloseMessage, []byte{})
-			sm.Conn.Close()
-			sm.Connected = false
-		}
-
-		sockURL := u.String() + sm.getNewStreamParam()
-		logrus.Infof("[Subscribe] Connecting to %s", sockURL)
-		sm.Conn, _, err = websocket.DefaultDialer.Dial(sockURL, nil)
-		if err != nil {
-			logrus.Fatal("[Subscribe] Error connecting to websocket:", err)
-		}
-
-		sm.Conn.SetReadLimit(maxMessageSize)
-		sm.Conn.SetReadDeadline(time.Now().Add(pongWait))
-		sm.Conn.SetPongHandler(func(string) error {
-			sm.Conn.SetReadDeadline(time.Now().Add(pongWait))
-			return nil
-		})
-		sm.Connected = true
-		logrus.Info("[Subscribe] Connected to websocket")
+	sockURL := u.String() + sm.getNewStreamParam()
+	logrus.Infof("[Subscribe] Connecting to %s", sockURL)
+	(*sm).Conn, _, err = websocket.DefaultDialer.Dial(sockURL, nil)
+	if err != nil {
+		logrus.Fatal("[Subscribe] Error connecting to websocket:", err)
 	}
+	logrus.Info("[Subscribe] Connected to websocket")
 }
 
-// Generates URL to reach stream_server websocket.
+// Generate URL to reach stream_server websocket.
 func (sm *SubscriberManager) getWebsocketURL() string {
 	host := viper.GetString("streams_server.host")
 	port := viper.GetString("streams_server.port")
@@ -208,11 +197,11 @@ func (sm *SubscriberManager) getWebsocketURL() string {
 	return "ws://" + host + ":" + port + api + "?" + "id=" + sm.ID
 }
 
-// Generates url Param for all the subscribed streams.
+// Generate URL Params for all the subscribed streams.
 func (sm *SubscriberManager) getNewStreamParam() string {
 	var sb bytes.Buffer
-	for _, stream := range sm.Streams {
-		sb.WriteString("&streams=/" + sm.ID + "/sensor/" + stream)
+	for _, v := range sm.Streams {
+		sb.WriteString("&streams=/" + sm.ID + "/sensor/" + MsgMap[v])
 	}
 	return sb.String()
 }

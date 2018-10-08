@@ -13,6 +13,7 @@ import (
 	"std_msgs"
 	"time"
 
+	"github.com/akio/rosgo/ros"
 	"github.com/gorilla/websocket"
 	"github.com/patrickmn/go-cache"
 	"github.com/sirupsen/logrus"
@@ -42,6 +43,12 @@ func main() {
 	st := cache.New(1*time.Hour, 2*time.Hour)
 	var conn *websocket.Conn
 
+	// Keys represent /topic and values represent message type.
+	// Add items to this map to add listeners.
+	streams := map[string]ros.MessageType{
+		"string":  std_msgs.MsgString,
+		"battery": power_msgs.MsgBatteryState}
+
 	a := NewAuthManager(st)
 	go a.setTokenInCache()
 
@@ -51,16 +58,12 @@ func main() {
 		logrus.Fatal("Reached maximum number of retries.")
 	}
 
-	s := NewSubscriber(id, st, conn)
+	s := NewSubscriber(id, st, conn, streams)
 	n, err := s.newNode()
 	if err != nil {
 		logrus.Fatal(err)
 	}
-
 	defer n.Shutdown()
-
-	go s.newListener("string", std_msgs.MsgString, n)
-	go s.newListener("battery", power_msgs.MsgBatteryState, n)
 
 	for as = range a.AuthStatus {
 		if !as.Connected {
