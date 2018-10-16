@@ -17,28 +17,28 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Authenticate struct that fetches token and sets in cache.
+// AuthManager struct that fetches token and sets in cache.
 type AuthManager struct {
 	Store      *cache.Cache
 	AuthStatus chan AuthStatus
 }
 
-// Connect struct to manage the connection status and errors.
+// AuthStatus struct to manage the connection status and errors.
 type AuthStatus struct {
 	Connected bool
 	Err       error
 }
 
-// Create new AuthManager that takes cache as parameter.
-func NewAuthManager(store *cache.Cache) *AuthManager {
+// NewAuthManager creates and returns new AuthManager.
+func NewAuthManager() *AuthManager {
 	auth := &AuthManager{
-		Store:      store,
-		AuthStatus: make(chan AuthStatus),
+		Store:      cache.New(1*time.Hour, 2*time.Hour),
+		AuthStatus: make(chan AuthStatus, 5),
 	}
 	return auth
 }
 
-// Set fetched token from server in cache.
+// setTokenInCache sets fetched token from server in cache.
 func (auth *AuthManager) setTokenInCache() {
 	retries := 0
 	maxRetries := viper.GetInt("auth.max_retries")
@@ -74,14 +74,14 @@ func (auth *AuthManager) setTokenInCache() {
 	}
 }
 
-// Calculate wait time and return duration.
+// calcWaitTime calculates wait time and returns duration.
 func calcWaitTime(retries int) time.Duration {
 	r := float64(retries)
 	retries = int(math.Pow(2, r))
 	return time.Duration(retries) * time.Second
 }
 
-// Load configeration from application.toml file.
+// loadConfig loads configuration from application.toml file and returns byte data.
 func loadConfig() ([]byte, error) {
 	p, err := json.Marshal(map[string]string{
 		"username":      viper.GetString("auth.username"),
@@ -96,7 +96,7 @@ func loadConfig() ([]byte, error) {
 	return p, err
 }
 
-// Acquire token from auth0 server and return it.
+// getTokenFromServer acquires token from auth0 server and returns it.
 func (auth *AuthManager) getTokenFromServer() (string, error) {
 	authEnabled := viper.GetBool("auth.enabled")
 	if !authEnabled {
@@ -108,8 +108,8 @@ func (auth *AuthManager) getTokenFromServer() (string, error) {
 		return "", fmt.Errorf("Error marshalling config: %+v", err)
 	}
 
-	auth_url := viper.GetString("auth.auth_url") + "/oauth/token/"
-	req, err := http.NewRequest("POST", auth_url, bytes.NewReader(p))
+	authURL := viper.GetString("auth.auth_url") + "/oauth/token/"
+	req, err := http.NewRequest("POST", authURL, bytes.NewReader(p))
 	if err != nil {
 		return "", fmt.Errorf("Error creating new request: %+v", err)
 	}
@@ -140,4 +140,13 @@ func (auth *AuthManager) getTokenFromServer() (string, error) {
 	}
 
 	return res["access_token"].(string), nil
+}
+
+// checkToken checks for token in cache and returns it.
+func (auth *AuthManager) checkToken() (string, error) {
+	t, found := (*auth).Store.Get("token")
+	if !found {
+		return "", fmt.Errorf("[Subscribe] Token not found in cache")
+	}
+	return t.(string), nil
 }
