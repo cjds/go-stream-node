@@ -6,7 +6,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/url"
 	"os"
 	"power_msgs"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/akio/rosgo/ros"
 	"github.com/gorilla/websocket"
-	"github.com/patrickmn/go-cache"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -34,26 +32,27 @@ const (
 	maxMessageSize = 128000
 )
 
+// MsgMap contains a map for ros message types.
 var MsgMap = map[ros.MessageType]string{
 	power_msgs.MsgBatteryState: "battery",
 	std_msgs.MsgString:         "string",
 }
 
-// Subscribe to topics and read data.
+// SubscriberManager struct.
 type SubscriberManager struct {
 	ID      string
-	Store   *cache.Cache
+	Auth    *AuthManager
 	Conn    *websocket.Conn
 	Streams map[string]ros.MessageType
 	Send    chan []byte
 	Stop    chan bool
 }
 
-// Create a new subscriber and return it.
-func NewSubscriber(id string, store *cache.Cache, conn *websocket.Conn, streams map[string]ros.MessageType) *SubscriberManager {
+// NewSubscriber creates a new SubscriberManager and returns it.
+func NewSubscriber(id string, a *AuthManager, conn *websocket.Conn, streams map[string]ros.MessageType) *SubscriberManager {
 	sm := &SubscriberManager{
 		ID:      id,
-		Store:   store,
+		Auth:    a,
 		Conn:    conn,
 		Streams: streams,
 		Send:    make(chan []byte, 5),
@@ -62,7 +61,7 @@ func NewSubscriber(id string, store *cache.Cache, conn *websocket.Conn, streams 
 	return sm
 }
 
-// Create new node and return it.
+// newNode creates and returns a new ros node.
 func (sm *SubscriberManager) newNode() (ros.Node, error) {
 	node, err := ros.NewNode("/listener", os.Args)
 	if err != nil {
@@ -76,21 +75,21 @@ func (sm *SubscriberManager) newNode() (ros.Node, error) {
 	return node, err
 }
 
-// Create new listeners for all streams in streams map.
+// createNewListeners adds new listeners to the ros node for all the streams.
 func (sm *SubscriberManager) createNewListeners(n ros.Node) {
 	for k, v := range sm.Streams {
 		go sm.newListener(k, v, n)
 	}
 }
 
-// Create new listener.
+// newListener adds individual listeners to the ros node.
 func (sm *SubscriberManager) newListener(topic string, msgType ros.MessageType, n ros.Node) {
 	n.Logger().SetSeverity(ros.LogLevelDebug)
 	n.NewSubscriber("/"+topic, msgType, sm.readData)
 	n.Spin()
 }
 
-// Read data and check for token in cache before sending data.
+// readData reads incoming data from robot and checks for token in cache before sending data.
 func (sm *SubscriberManager) readData(msg interface{}) {
 	payload := Payload{}
 
@@ -111,6 +110,7 @@ func (sm *SubscriberManager) readData(msg interface{}) {
 		}
 	default:
 		logrus.Info("[Subscribe] Unsupported message type")
+		return
 	}
 
 	payload.Customer = "NoCustomer"
@@ -127,7 +127,7 @@ func (sm *SubscriberManager) readData(msg interface{}) {
 	sm.Send <- m
 }
 
-// Read responses from websocket.
+// readPump reads responses from websocket.
 // This is essential for maintaining the websocket connection when
 // there is no data being tranferred and also for checking unexpected
 // closure of socket connection by streams server.
@@ -150,7 +150,7 @@ func (sm *SubscriberManager) readPump() {
 	}
 }
 
-// Upstream payload data through socket.
+// writePump upstreams payload data through socket.
 // Ticker is used to ping streams server and is essential to
 // maintain the websocket connection when no data is being sent.
 func (sm *SubscriberManager) writePump() {
@@ -204,13 +204,4 @@ func (sm *SubscriberManager) getNewStreamParam() string {
 		sb.WriteString("&streams=/" + sm.ID + "/sensor/" + MsgMap[v])
 	}
 	return sb.String()
-}
-
-// Check for token in cache.
-func (sm *SubscriberManager) checkToken() (string, error) {
-	t, found := (*sm).Store.Get("token")
-	if !found {
-		return "", fmt.Errorf("[Subscribe] Token not found in cache.")
-	}
-	return t.(string), nil
 }

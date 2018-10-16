@@ -5,6 +5,7 @@ package main
 
 import ()
 
+// Message struct of message data sent through socket.
 type Message struct {
 	Type    string   `json:"type"`
 	Payload *Payload `json:"payload"`
@@ -24,6 +25,7 @@ type BatteryData struct {
 	Percent   float32 `json:"percent"`
 }
 
+// StringData define the data format for string data.
 type StringData struct {
 	Timestamp int64  `json:"timestamp"`
 	Message   string `json:"message"`

@@ -11,11 +11,9 @@ import (
 	"flag"
 	"power_msgs"
 	"std_msgs"
-	"time"
 
 	"github.com/akio/rosgo/ros"
 	"github.com/gorilla/websocket"
-	"github.com/patrickmn/go-cache"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -40,25 +38,24 @@ func main() {
 	}
 
 	id := viper.GetString("auth.username")
-	st := cache.New(1*time.Hour, 2*time.Hour)
 	var conn *websocket.Conn
 
-	// Keys represent /topic and values represent message type.
+	// streams keys represent /topic and values represent message type.
 	// Add items to this map to add listeners.
 	streams := map[string]ros.MessageType{
 		"string":  std_msgs.MsgString,
 		"battery": power_msgs.MsgBatteryState}
 
-	a := NewAuthManager(st)
+	a := NewAuthManager()
 	go a.setTokenInCache()
 
 	as := <-a.AuthStatus
 	if !as.Connected {
 		logrus.Error(as.Err)
-		logrus.Fatal("Reached maximum number of retries.")
+		logrus.Fatal("Reached maximum number of retries")
 	}
 
-	s := NewSubscriber(id, st, conn, streams)
+	s := NewSubscriber(id, a, conn, streams)
 	n, err := s.newNode()
 	if err != nil {
 		logrus.Fatal(err)
@@ -68,7 +65,7 @@ func main() {
 	for as = range a.AuthStatus {
 		if !as.Connected {
 			logrus.Error(as.Err)
-			logrus.Fatal("Reached maximum number of retries.")
+			logrus.Fatal("Reached maximum number of retries")
 		}
 	}
 }
