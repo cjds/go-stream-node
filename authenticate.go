@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -19,27 +20,23 @@ import (
 
 // AuthManager struct that fetches token and sets in cache.
 type AuthManager struct {
-	Store      *cache.Cache
-	AuthStatus chan AuthStatus
-}
-
-// AuthStatus struct to manage the connection status and errors.
-type AuthStatus struct {
-	Connected bool
-	Err       error
+	Store   *cache.Cache
+	Connect chan bool
 }
 
 // NewAuthManager creates and returns new AuthManager.
-func NewAuthManager() *AuthManager {
+func NewAuthManager() (*AuthManager, context.Context) {
 	auth := &AuthManager{
-		Store:      cache.New(1*time.Hour, 2*time.Hour),
-		AuthStatus: make(chan AuthStatus, 5),
+		Store:   cache.New(1*time.Hour, 2*time.Hour),
+		Connect: make(chan bool),
 	}
-	return auth
+	ctx, cancel := context.WithCancel(context.Background())
+	go auth.setTokenInCache(cancel)
+	return auth, ctx
 }
 
 // setTokenInCache sets fetched token from server in cache.
-func (auth *AuthManager) setTokenInCache() {
+func (auth *AuthManager) setTokenInCache(cancel context.CancelFunc) {
 	retries := 0
 	maxRetries := viper.GetInt("auth.max_retries")
 	onSuccessWait := viper.GetDuration("auth.on_success_wait")
@@ -57,21 +54,13 @@ func (auth *AuthManager) setTokenInCache() {
 			time.Sleep(waitTime)
 		} else {
 			(*auth).Store.Set("token", t, cache.DefaultExpiration)
-			auth.AuthStatus <- AuthStatus{
-				Connected: true,
-				Err:       nil,
-			}
 			logrus.Info("[Auth] Succesfully received token.")
 			retries = 0
-			time.Sleep(onSuccessWait * time.Minute)
+			auth.Connect <- true
+			time.Sleep(onSuccessWait * time.Second)
 		}
 	}
-
-	//Send error message through channel after maximum retries.
-	auth.AuthStatus <- AuthStatus{
-		Connected: false,
-		Err:       err,
-	}
+	cancel()
 }
 
 // calcWaitTime calculates wait time and returns duration.

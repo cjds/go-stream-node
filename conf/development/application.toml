@@ -13,7 +13,7 @@ realm                = "dev"
 auth_url             = "https://hello-there.auth0.com"
 use_deprecated_login = false
 max_retries          = 3
-on_success_wait      = 10 #minutes
+on_success_wait      = 300 #seconds
 
 [streams_server]
 host        = "10.100.1.40"

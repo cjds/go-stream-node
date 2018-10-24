@@ -5,7 +5,7 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
+	"context"
 	"net/url"
 	"os"
 	"power_msgs"
@@ -26,7 +26,7 @@ const (
 	pongWait = 60 * time.Second
 
 	// Send pings to peer with this period. Must be less than pongWait.
-	pingPeriod = (pongWait) / 10
+	pingPeriod = (pongWait * 9) / 10
 
 	// Maximum message size allowed from peer.
 	maxMessageSize = 128000
@@ -44,8 +44,7 @@ type SubscriberManager struct {
 	Auth    *AuthManager
 	Conn    *websocket.Conn
 	Streams map[string]ros.MessageType
-	Send    chan []byte
-	Stop    chan bool
+	Send    chan *bytes.Buffer
 }
 
 // NewSubscriber creates a new SubscriberManager and returns it.
@@ -55,83 +54,81 @@ func NewSubscriber(id string, a *AuthManager, conn *websocket.Conn, streams map[
 		Auth:    a,
 		Conn:    conn,
 		Streams: streams,
-		Send:    make(chan []byte, 5),
-		Stop:    make(chan bool),
+		Send:    make(chan *bytes.Buffer, 5),
 	}
 	return sm
 }
 
 // newNode creates and returns a new ros node.
-func (sm *SubscriberManager) newNode() (ros.Node, error) {
+func (sm *SubscriberManager) newNode(ctx context.Context) {
 	node, err := ros.NewNode("/listener", os.Args)
 	if err != nil {
 		logrus.Info(err)
-		return nil, err
+		return
 	}
-	sm.connectToSocket()
-	go sm.readPump()
-	go sm.writePump()
-	sm.createNewListeners(node)
-	return node, err
+
+	node.Logger().SetSeverity(ros.LogLevelInfo)
+	childCtx, cancel := context.WithCancel(ctx)
+
+	for {
+		select {
+		case <-ctx.Done():
+			logrus.Info("[Subscribe] Shutting down readPump, writePump, websocket and node and exiting")
+			cancel()
+			sm.Conn.Close()
+			node.Shutdown()
+			return
+		case <-sm.Auth.Connect:
+			sm.connectToSocket()
+			go sm.readPump(childCtx)
+			go sm.writePump(childCtx)
+			go sm.createNewListeners(node)
+		}
+	}
 }
 
 // createNewListeners adds new listeners to the ros node for all the streams.
 func (sm *SubscriberManager) createNewListeners(n ros.Node) {
 	for k, v := range sm.Streams {
-		go sm.newListener(k, v, n)
+		// n.NewSubscriber creates new subscribers.
+		// fun() implements the third parameter which is a callback interface{}.
+		// Whenever a new message is emited, sm.readData routine is called 
+		// with the message data.
+		n.NewSubscriber("/"+k, v, sm.readData)
 	}
-}
-
-// newListener adds individual listeners to the ros node.
-func (sm *SubscriberManager) newListener(topic string, msgType ros.MessageType, n ros.Node) {
-	n.Logger().SetSeverity(ros.LogLevelDebug)
-	n.NewSubscriber("/"+topic, msgType, sm.readData)
 	n.Spin()
 }
 
 // readData reads incoming data from robot and checks for token in cache before sending data.
 func (sm *SubscriberManager) readData(msg interface{}) {
-	payload := Payload{}
+	var mb bytes.Buffer
+	var err error
 
 	switch msg.(type) {
 	case *power_msgs.BatteryState:
 		m := msg.(*power_msgs.BatteryState)
-		payload.StreamURL = "/" + sm.ID + "/sensor/battery"
-		payload.Data = &BatteryData{
-			Timestamp: time.Now().UnixNano() / int64(time.Millisecond),
-			Percent:   m.ChargeLevel,
-		}
+		err = m.Serialize(&mb)
 	case *std_msgs.String:
 		m := msg.(*std_msgs.String)
-		payload.StreamURL = "/" + sm.ID + "/sensor/string"
-		payload.Data = &StringData{
-			Timestamp: time.Now().UnixNano() / int64(time.Millisecond),
-			Message:   m.Data,
-		}
+		err = m.Serialize(&mb)
 	default:
 		logrus.Info("[Subscribe] Unsupported message type")
 		return
 	}
 
-	payload.Customer = "NoCustomer"
-	payload.ProducerID = sm.ID
-
-	message := Message{}
-	message.Type = "publish"
-	message.Payload = &payload
-	m, err := json.Marshal(message)
 	if err != nil {
-		logrus.Error("Error marshalling:", err)
+		logrus.Error(err)
+		return
 	}
 
-	sm.Send <- m
+	sm.Send <- &mb
 }
 
 // readPump reads responses from websocket.
 // This is essential for maintaining the websocket connection when
 // there is no data being tranferred and also for checking unexpected
 // closure of socket connection by streams server.
-func (sm *SubscriberManager) readPump() {
+func (sm *SubscriberManager) readPump(ctx context.Context) {
 	sm.Conn.SetReadLimit(maxMessageSize)
 	sm.Conn.SetReadDeadline(time.Now().Add(pongWait))
 	sm.Conn.SetPongHandler(func(string) error {
@@ -140,12 +137,18 @@ func (sm *SubscriberManager) readPump() {
 	})
 
 	for {
-		_, _, err := sm.Conn.ReadMessage()
-		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-				logrus.Fatal("Websocket has unexpectedly closed: ", err)
+		select {
+		case <-ctx.Done():
+			logrus.Info("[Subscribe] readPump cancelled")
+			return
+		default:
+			_, _, err := sm.Conn.ReadMessage()
+			if err != nil {
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+					logrus.Fatal("Websocket has unexpectedly closed: ", err)
+				}
+				logrus.Error("[Subscribe] Websocket reading error:", err)
 			}
-			logrus.Warn("[Subscribe] Websocket reading error:", err)
 		}
 	}
 }
@@ -153,14 +156,18 @@ func (sm *SubscriberManager) readPump() {
 // writePump upstreams payload data through socket.
 // Ticker is used to ping streams server and is essential to
 // maintain the websocket connection when no data is being sent.
-func (sm *SubscriberManager) writePump() {
+func (sm *SubscriberManager) writePump(ctx context.Context) {
 	ticker := time.NewTicker(pingPeriod)
 	defer ticker.Stop()
+
 	for {
 		select {
+		case <-ctx.Done():
+			logrus.Info("[Subscribe] writePump cancelled")
+			return
 		case message := <-sm.Send:
 			sm.Conn.SetWriteDeadline(time.Now().Add(writeWait))
-			err := sm.Conn.WriteMessage(websocket.TextMessage, message)
+			err := sm.Conn.WriteMessage(websocket.BinaryMessage, message.Bytes())
 			if err != nil {
 				return
 			}
@@ -174,22 +181,32 @@ func (sm *SubscriberManager) writePump() {
 	}
 }
 
-// Connect to websocket with all subscribed streams as URL params.
+// connectToSocket Creates the initital websocket connection to streams server.
 func (sm *SubscriberManager) connectToSocket() {
+	if sm.Conn != nil {
+		sm.Conn.Close()
+	}
+
 	s := sm.getWebsocketURL()
 	u, _ := url.Parse(s)
-	var err error
 
-	sockURL := u.String() + sm.getNewStreamParam()
+	token, err := sm.Auth.checkToken()
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	sockURL := u.String() + sm.getNewStreamParam() + "&token=" + token
 	logrus.Infof("[Subscribe] Connecting to %s", sockURL)
+
 	(*sm).Conn, _, err = websocket.DefaultDialer.Dial(sockURL, nil)
 	if err != nil {
 		logrus.Fatal("[Subscribe] Error connecting to websocket:", err)
 	}
+
 	logrus.Info("[Subscribe] Connected to websocket")
 }
 
-// Generate URL to reach stream_server websocket.
+// getWebsocketURL generates URL to reach stream_server websocket.
 func (sm *SubscriberManager) getWebsocketURL() string {
 	host := viper.GetString("streams_server.host")
 	port := viper.GetString("streams_server.port")
@@ -197,7 +214,7 @@ func (sm *SubscriberManager) getWebsocketURL() string {
 	return "ws://" + host + ":" + port + api + "?" + "id=" + sm.ID
 }
 
-// Generate URL Params for all the subscribed streams.
+// getNewStreamParam generates URL params for all the streams.
 func (sm *SubscriberManager) getNewStreamParam() string {
 	var sb bytes.Buffer
 	for _, v := range sm.Streams {
