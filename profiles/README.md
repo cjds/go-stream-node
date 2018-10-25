@@ -75,10 +75,14 @@ These are the changes that have been made that positively impacted the CPU and m
 * Serializing the data as binary instead of JSON marshalling. To see the difference in usage check `context-benchmark-alloc-space.pdf` and `master-alloc-space.pdf` in `profiles/memory`. Profiling made at 150hz data rate and 60s duration.
 
 Note that profiler's CPU and memory usage is also included in the metrics.
-sm.readData Go routine CPU usage comparision:
+
+**node.Spin() CPU usage comparision based on sm.readData:**
+
 Data rate: 150hz
 Duration: 300s
-![node.Spin usage](images/node.Spin-Usage-Without-goroutine-300s.png "node.Spin which calls the job() callback function i.e sm.readData without a go routine.")
 
-![node.Spin usage](images/node.Spin-Usage-goroutine-300s.png "node.Spin usage after calling sm.readData as a routine.")
+Usage of node.Spin() which calls the job() callback function i.e sm.readData without a routine:
+<img src="images/node.Spin-Usage-Without-goroutine-300s.png" width="650">
 
+node.Spin() usage after calling sm.readData as a routine:
+<img src="images/node.Spin-Usage-goroutine-300s.png" width="650">
