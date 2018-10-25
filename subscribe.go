@@ -54,7 +54,7 @@ func NewSubscriber(id string, a *AuthManager, conn *websocket.Conn, streams map[
 		Auth:    a,
 		Conn:    conn,
 		Streams: streams,
-		Send:    make(chan *bytes.Buffer, 5),
+		Send:    make(chan *bytes.Buffer, 100),
 	}
 	return sm
 }
@@ -92,9 +92,10 @@ func (sm *SubscriberManager) createNewListeners(n ros.Node) {
 	for k, v := range sm.Streams {
 		// n.NewSubscriber creates new subscribers.
 		// fun() implements the third parameter which is a callback interface{}.
-		// Whenever a new message is emited, sm.readData routine is called 
+		// Whenever a new message is emited, sm.readData routine is called
 		// with the message data.
-		n.NewSubscriber("/"+k, v, sm.readData)
+		//n.NewSubscriber("/"+k, v, sm.readData)
+		n.NewSubscriber("/"+k, v, func(msg interface{}) { go sm.readData(msg) })
 	}
 	n.Spin()
 }
@@ -167,7 +168,8 @@ func (sm *SubscriberManager) writePump(ctx context.Context) {
 			return
 		case message := <-sm.Send:
 			sm.Conn.SetWriteDeadline(time.Now().Add(writeWait))
-			err := sm.Conn.WriteMessage(websocket.BinaryMessage, message.Bytes())
+			mb := message.Bytes()
+			err := sm.Conn.WriteMessage(websocket.BinaryMessage, mb)
 			if err != nil {
 				return
 			}
@@ -202,7 +204,6 @@ func (sm *SubscriberManager) connectToSocket() {
 	if err != nil {
 		logrus.Fatal("[Subscribe] Error connecting to websocket:", err)
 	}
-
 	logrus.Info("[Subscribe] Connected to websocket")
 }
 

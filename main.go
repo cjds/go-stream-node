@@ -10,12 +10,11 @@ package main
 import (
 	"flag"
 	"power_msgs"
-	//"runtime"
 	"std_msgs"
 
 	"github.com/akio/rosgo/ros"
 	"github.com/gorilla/websocket"
-	//"github.com/pkg/profile"
+	"github.com/pkg/profile"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -34,7 +33,7 @@ func init() {
 }
 
 func main() {
-	//defer profile.Start(profile.CPUProfile, profile.ProfilePath("./profiles/cpu")).Stop()
+	defer profile.Start(profile.CPUProfile, profile.ProfilePath("./profiles/cpu")).Stop()
 	//defer profile.Start(profile.MemProfile, profile.ProfilePath("./profiles/memory")).Stop()
 
 	viper.AddConfigPath(*conf)
