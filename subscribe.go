@@ -59,30 +59,33 @@ func NewSubscriber(id string, a *AuthManager, conn *websocket.Conn, streams map[
 	return sm
 }
 
-// newNode creates and returns a new ros node.
-func (sm *SubscriberManager) newNode(ctx context.Context) {
+// Start creates a new ros node, adds new listeners and starts socket routines
+func (sm *SubscriberManager) Start(ctx context.Context) {
 	node, err := ros.NewNode("/listener", os.Args)
 	if err != nil {
 		logrus.Info(err)
 		return
 	}
 
+	defer node.Shutdown()
 	node.Logger().SetSeverity(ros.LogLevelInfo)
-	childCtx, cancel := context.WithCancel(ctx)
+	go sm.createNewListeners(node)
+
+	var cancel context.CancelFunc
+	var childCtx context.Context
 
 	for {
 		select {
 		case <-ctx.Done():
-			logrus.Info("[Subscribe] Shutting down readPump, writePump, websocket and node and exiting")
-			cancel()
-			sm.Conn.Close()
-			node.Shutdown()
 			return
 		case <-sm.Auth.Connect:
+			if cancel != nil {
+				cancel()
+			}
+			childCtx, cancel = context.WithCancel(ctx)
 			sm.connectToSocket()
 			go sm.readPump(childCtx)
 			go sm.writePump(childCtx)
-			go sm.createNewListeners(node)
 		}
 	}
 }
@@ -91,12 +94,12 @@ func (sm *SubscriberManager) newNode(ctx context.Context) {
 func (sm *SubscriberManager) createNewListeners(n ros.Node) {
 	for k, v := range sm.Streams {
 		// n.NewSubscriber creates new subscribers.
-		// fun() implements the third parameter which is a callback interface{}.
+		// func() implements the third parameter which is a callback interface{}.
 		// Whenever a new message is emited, sm.readData routine is called
 		// with the message data.
-		//n.NewSubscriber("/"+k, v, sm.readData)
 		n.NewSubscriber("/"+k, v, func(msg interface{}) { go sm.readData(msg) })
 	}
+
 	n.Spin()
 }
 
@@ -197,13 +200,14 @@ func (sm *SubscriberManager) connectToSocket() {
 		logrus.Fatal(err)
 	}
 
-	sockURL := u.String() + sm.getNewStreamParam() + "&token=" + token
+	sockURL := u.String() + sm.getNewStreamParam(token)
 	logrus.Infof("[Subscribe] Connecting to %s", sockURL)
 
-	(*sm).Conn, _, err = websocket.DefaultDialer.Dial(sockURL, nil)
+	sm.Conn, _, err = websocket.DefaultDialer.Dial(sockURL, nil)
 	if err != nil {
 		logrus.Fatal("[Subscribe] Error connecting to websocket:", err)
 	}
+
 	logrus.Info("[Subscribe] Connected to websocket")
 }
 
@@ -216,10 +220,10 @@ func (sm *SubscriberManager) getWebsocketURL() string {
 }
 
 // getNewStreamParam generates URL params for all the streams.
-func (sm *SubscriberManager) getNewStreamParam() string {
+func (sm *SubscriberManager) getNewStreamParam(token string) string {
 	var sb bytes.Buffer
 	for _, v := range sm.Streams {
 		sb.WriteString("&streams=/" + sm.ID + "/sensor/" + MsgMap[v])
 	}
-	return sb.String()
+	return sb.String() + "&token=" + token
 }

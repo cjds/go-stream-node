@@ -33,8 +33,15 @@ func init() {
 }
 
 func main() {
-	defer profile.Start(profile.CPUProfile, profile.ProfilePath("./profiles/cpu")).Stop()
-	//defer profile.Start(profile.MemProfile, profile.ProfilePath("./profiles/memory")).Stop()
+	mode := flag.String("profile.mode", "", "enable profiling mode, one of [cpu, memory]")
+	flag.Parse()
+	switch *mode {
+	case "cpu":
+		defer profile.Start(profile.CPUProfile, profile.ProfilePath("./profiles/cpu")).Stop()
+	case "memory":
+		defer profile.Start(profile.MemProfile, profile.ProfilePath("./profiles/memory")).Stop()
+	default:
+	}
 
 	viper.AddConfigPath(*conf)
 	if err := viper.ReadInConfig(); err != nil {
@@ -52,5 +59,5 @@ func main() {
 
 	a, ctx := NewAuthManager()
 	s := NewSubscriber(id, a, conn, streams)
-	s.newNode(ctx)
+	s.Start(ctx)
 }

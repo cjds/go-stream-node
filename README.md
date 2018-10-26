@@ -12,14 +12,18 @@ dep ensure
 ```
 This should install all the dependencies required to run go stream node.
 
-Run the following command to automatically generate GO files for message types from the message definitions
+In addition to above dependencies, we need `gengo` to automatically generate GO files for message types. Use the following commmand to get gengo.
+```
+go get github.com/akio/rosgo/gengo
+```
+Go to your `$GOPATH/src/github.com/akio/rosgo/gengo` and run `go install`. This should add the `gengo executable to your `$GOPATH/bin`. Now run the following command to automatically generate GO files for message types from the message definitions
 ```
 go generate
 ```
 ### Starting Stream Node
 Now, run the following command to start the stream node server. Be sure to change streams server host address in `application.toml` to wherever your streams server is running if you run across `connection refused` error.
 ```
-go install && go-stream-server
+go install && go-stream-node
 ```
 To add new listeners, following format can be used in `main.go` which will add new stream type to `streams` map. This will add additional listeners to the stream node.
 ```
