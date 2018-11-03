@@ -6,10 +6,12 @@ package main
 // Generates message structs. Run `go generate` in the directory.
 //go:generate gengo msg power_msgs/BatteryState
 //go:generate gengo msg std_msgs/String
-
+//go:generate gengo msg std_msgs/Header
+//go:generate gengo msg sensor_msgs/LaserScan
 import (
 	"flag"
 	"power_msgs"
+	"sensor_msgs"
 	"std_msgs"
 
 	"github.com/akio/rosgo/ros"
@@ -54,8 +56,9 @@ func main() {
 	// streams keys represent /topic and values represent message type.
 	// Add items to this map to add listeners.
 	streams := map[string]ros.MessageType{
-		"string_messages": std_msgs.MsgString,
-		"battery_state":   power_msgs.MsgBatteryState}
+		"battery_state":   power_msgs.MsgBatteryState,
+		"base_scan_raw":   sensor_msgs.MsgLaserScan,
+		"string_messages": std_msgs.MsgString}
 
 	a, ctx := NewAuthManager()
 	s := NewSubscriber(id, a, conn, streams)

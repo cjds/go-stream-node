@@ -16,7 +16,7 @@ In addition to above dependencies, we need `gengo` to automatically generate GO 
 ```
 go get github.com/akio/rosgo/gengo
 ```
-Go to your `$GOPATH/src/github.com/akio/rosgo/gengo` and run `go install`. This should add the `gengo executable to your `$GOPATH/bin`. Now run the following command to automatically generate GO files for message types from the message definitions
+Go to your `$GOPATH/src/github.com/akio/rosgo/gengo` and run `go install`. This should add the `gengo` executable to your `$GOPATH/bin`. Now run the following command to automatically generate GO files for message types from the message definitions
 ```
 go generate
 ```
