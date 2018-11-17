@@ -1,36 +1,41 @@
 syntax = "proto3";
 
+package messages;
+
 message String {
-  string data = 1;
+  int64 timestamp = 1;
+  string data = 2;
 }
 
 message BatteryState {
-  string name = 1;
-  bool is_charging = 2;
-  float total_capacity = 3;
-  float current_capacity = 4;
-  float battery_voltage = 5;
-  float supply_voltage = 6;
-  float charger_voltage = 7;
+  int64 timestamp = 1;
+  string name = 2;
+  bool is_charging = 3;
+  float total_capacity = 4;
+  float current_capacity = 5;
+  float battery_voltage = 6;
+  float supply_voltage = 7;
+  float charger_voltage = 8;
 }
 
 message LaserScan {
-  float angle_min = 1;
-  float angle_max = 2;
-  float angle_increment = 3;
-  float time_increment = 4;
-  float scan_time = 5;
-  float range_min = 6;
-  float range_max = 7;
-  repeated float ranges = 8 [packed=true];
-  repeated float intensities = 9 [packed=true];
+  int64 timestamp = 1;
+  float angle_min = 2;
+  float angle_max = 3;
+  float angle_increment = 4;
+  float time_increment = 5;
+  float scan_time = 6;
+  float range_min = 7;
+  float range_max = 8;
+  repeated float ranges = 9 [packed=true];
+  repeated float intensities = 10 [packed=true];
 }
 
 message PayLoad {
+  string stream = 1;
   oneof data {
     String string_message = 2;
     BatteryState battery_state = 3;
     LaserScan laser_scan = 4;
   }
 }
-

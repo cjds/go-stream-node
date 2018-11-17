@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"compress/zlib"
 	"context"
-	//"crypto/md5"
 	"go-stream-node/messages"
 	"net/url"
 	"os"
@@ -41,7 +40,7 @@ const (
 var MsgMap = map[ros.MessageType]string{
 	power_msgs.MsgBatteryState: "battery",
 	std_msgs.MsgString:         "string",
-	sensor_msgs.MsgLaserScan:   "laser",
+	sensor_msgs.MsgLaserScan:   "rawlaser",
 }
 
 // SubscriberManager struct.
@@ -86,6 +85,7 @@ func (sm *SubscriberManager) Start(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
+
 		case <-sm.Auth.Connect:
 			if cancel != nil {
 				cancel()
@@ -107,6 +107,7 @@ func (sm *SubscriberManager) createNewListeners(n ros.Node) {
 		// with the message data.
 		n.NewSubscriber("/"+k, v, func(msg ros.Message) { go sm.readData(msg) })
 	}
+
 	defer n.Shutdown()
 	n.Spin()
 }
@@ -116,12 +117,15 @@ func (sm *SubscriberManager) createNewListeners(n ros.Node) {
 // messages.{msgType} struct contains extra fields for unknown values which is auto generated.
 func (sm *SubscriberManager) readData(msg ros.Message) {
 	pl := &messages.PayLoad{}
+	timeNow := time.Now().UnixNano() / int64(time.Millisecond)
 
 	switch msg.(type) {
 	case *power_msgs.BatteryState:
 		m := msg.(*power_msgs.BatteryState)
+		pl.Stream = "/" + sm.ID + "/sensor/battery"
 		pl.Data = &messages.PayLoad_BatteryState{
 			&messages.BatteryState{
+				Timestamp:       timeNow,
 				Name:            m.Name,
 				IsCharging:      m.IsCharging,
 				TotalCapacity:   m.TotalCapacity,
@@ -131,10 +135,13 @@ func (sm *SubscriberManager) readData(msg ros.Message) {
 				ChargerVoltage:  m.ChargerVoltage,
 			},
 		}
+
 	case *sensor_msgs.LaserScan:
 		m := msg.(*sensor_msgs.LaserScan)
+		pl.Stream = "/" + sm.ID + "/sensor/rawlaser"
 		pl.Data = &messages.PayLoad_LaserScan{
 			&messages.LaserScan{
+				Timestamp:      timeNow,
 				AngleMin:       m.AngleMin,
 				AngleMax:       m.AngleMax,
 				AngleIncrement: m.AngleIncrement,
@@ -146,13 +153,17 @@ func (sm *SubscriberManager) readData(msg ros.Message) {
 				Intensities:    m.Intensities,
 			},
 		}
+
 	case *std_msgs.String:
 		m := msg.(*std_msgs.String)
+		pl.Stream = "/" + sm.ID + "/sensor/string"
 		pl.Data = &messages.PayLoad_StringMessage{
 			&messages.String{
-				Data: m.Data,
+				Timestamp: timeNow,
+				Data:      m.Data,
 			},
 		}
+
 	default:
 		logrus.Error("[Subscribe] Unsupported message type")
 		return
@@ -163,8 +174,6 @@ func (sm *SubscriberManager) readData(msg ros.Message) {
 		logrus.Warn(err)
 		return
 	}
-
-	//logrus.Infof("Md5 Hash: %x\n", md5.Sum(message))
 
 	sm.Send <- message
 }
@@ -185,6 +194,7 @@ func (sm *SubscriberManager) readPump(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
+
 		default:
 			_, _, err := sm.Conn.ReadMessage()
 			if err != nil {
@@ -212,6 +222,7 @@ func (sm *SubscriberManager) writePump(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
+
 		case message := <-sm.Send:
 			cd.Reset()
 			w.Reset(&cd)
@@ -223,6 +234,7 @@ func (sm *SubscriberManager) writePump(ctx context.Context) {
 			if err != nil {
 				return
 			}
+
 		case <-ticker.C:
 			sm.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			err := sm.Conn.WriteMessage(websocket.PingMessage, []byte{})
@@ -241,7 +253,7 @@ func (sm *SubscriberManager) connectToSocket() {
 		sm.Conn.Close()
 	}
 
-	s := sm.getWebsocketUrl()
+	s := sm.getWebsocketURL()
 	u, _ := url.Parse(s)
 
 	token, err := sm.Auth.checkToken()
@@ -249,10 +261,10 @@ func (sm *SubscriberManager) connectToSocket() {
 		logrus.Fatal(err)
 	}
 
-	sockUrl := u.String() + sm.getNewStreamParam(token)
-	logrus.Infof("[Subscribe] Connecting to %s", sockUrl)
+	sockURL := u.String() + sm.getNewStreamParam(token)
+	logrus.Infof("[Subscribe] Connecting to %s", sockURL)
 
-	sm.Conn, _, err = websocket.DefaultDialer.Dial(sockUrl, nil)
+	sm.Conn, _, err = websocket.DefaultDialer.Dial(sockURL, nil)
 	if err != nil {
 		logrus.Fatal("[Subscribe] Error connecting to websocket:", err)
 	}
@@ -261,10 +273,11 @@ func (sm *SubscriberManager) connectToSocket() {
 }
 
 // getWebsocketURL generates URL to reach stream_server websocket.
-func (sm *SubscriberManager) getWebsocketUrl() string {
+func (sm *SubscriberManager) getWebsocketURL() string {
 	host := viper.GetString("streams_server.host")
 	port := viper.GetString("streams_server.port")
 	api := viper.GetString("streams_server.api_uri")
+
 	return "ws://" + host + ":" + port + api + "?" + "id=" + sm.ID
 }
 
@@ -274,5 +287,6 @@ func (sm *SubscriberManager) getNewStreamParam(token string) string {
 	for _, v := range sm.Streams {
 		sb.WriteString("&streams=/" + sm.ID + "/sensor/" + MsgMap[v])
 	}
+
 	return sb.String() + "&token=" + token
 }

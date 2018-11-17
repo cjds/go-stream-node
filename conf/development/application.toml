@@ -18,5 +18,5 @@ on_success_wait      = 300 #seconds
 [streams_server]
 host        = "10.100.1.40"
 port        = 8080
-api_uri     = "/streams/api/v1/producer"
+api_uri     = "/streams/api/v1/producer/go-stream"
 
