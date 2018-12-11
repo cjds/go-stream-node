@@ -46,5 +46,10 @@ rostopic pub /string std_msgs/String "data:'Test'"
 ```
 Do note that `std_msgs/String` type data is not supported on streams server. Hence, you will probably see an error on your streams server.
 
+Tests can be run using the following command. Make sure roscore is up and running before running the test.
+```
+go test -test.v=true
+```
+
 ### Configurations
 Changing auth0 credentials and streams server's properties can be done by editing the `application.toml` file in `conf/development` directory.

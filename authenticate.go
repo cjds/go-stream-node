@@ -32,6 +32,7 @@ func NewAuthManager() (*AuthManager, context.Context) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	go auth.setTokenInCache(cancel)
+
 	return auth, ctx
 }
 
@@ -54,12 +55,12 @@ func (auth *AuthManager) setTokenInCache(cancel context.CancelFunc) {
 			time.Sleep(waitTime)
 		} else {
 			(*auth).Store.Set("token", t, cache.DefaultExpiration)
-			logrus.Info("[Auth] Succesfully received token.")
 			retries = 0
 			auth.Connect <- true
 			time.Sleep(onSuccessWait * time.Second)
 		}
 	}
+
 	cancel()
 }
 
@@ -67,6 +68,7 @@ func (auth *AuthManager) setTokenInCache(cancel context.CancelFunc) {
 func calcWaitTime(retries int) time.Duration {
 	r := float64(retries)
 	retries = int(math.Pow(2, r))
+
 	return time.Duration(retries) * time.Second
 }
 
@@ -137,5 +139,6 @@ func (auth *AuthManager) checkToken() (string, error) {
 	if !found {
 		return "", fmt.Errorf("[Subscribe] Token not found in cache")
 	}
+
 	return t.(string), nil
 }

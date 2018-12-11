@@ -1,0 +1,35 @@
+namespace flatmessages;
+
+table MsgString {
+  data:string;
+}
+
+table BatteryState {
+  name:string;
+  charge_level:float;
+  is_charging:bool;
+  total_capacity:float;
+  current_capacity:float;
+  battery_voltage:float;
+  supply_voltage:float;
+  charger_voltage:float;
+}
+
+struct Header {
+  seq: uint;
+  stamp: ulong;
+}
+
+table LaserScan {
+  header: Header;
+  angle_min:float;
+  angle_max:float;
+  angle_increment:float;
+  time_increment:float;
+  scan_time:float;
+  range_min:float;
+  range_max:float;
+  ranges:[float];
+  intensities:[float];
+}
+

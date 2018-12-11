@@ -3,12 +3,20 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:d7552ed801e8c4b08cb1f8a38e22822dcf0e123e68f2c28ef5bf0b4c44a71aa6"
+  digest = "1:78b9c7e3858d0239941d4ffe7350c1cebecb82e895c8aabc011bea7aa51a730a"
   name = "github.com/akio/rosgo"
   packages = [
     "ros",
     "xmlrpc",
   ]
+  pruneopts = "UT"
+  revision = "9bef6ddefa3263119fd2d01513dee26a65e09cd1"
+
+[[projects]]
+  branch = "master"
+  digest = "1:78b9c7e3858d0239941d4ffe7350c1cebecb82e895c8aabc011bea7aa51a730a"
+  name = "github.com/akio/rosgo"
+  packages = ["ros"]
   pruneopts = "UT"
   revision = "9bef6ddefa3263119fd2d01513dee26a65e09cd1"
 
@@ -27,6 +35,14 @@
   pruneopts = "UT"
   revision = "aa810b61a9c79d51363740d207bb46cf8e620ed5"
   version = "v1.2.0"
+
+[[projects]]
+  digest = "1:e02b687ade0c19c038ecce3ea326d756519adc4bba1203a9e76d620b12354892"
+  name = "github.com/google/flatbuffers"
+  packages = ["go"]
+  pruneopts = "UT"
+  revision = "c0698cc33f1e534bb59c455909b88cc2726089af"
+  version = "v1.10.0"
 
 [[projects]]
   digest = "1:7b5c6e2eeaa9ae5907c391a91c132abfd5c9e8a784a341b5625e750c67e6825d"
@@ -104,12 +120,12 @@
   version = "v1.2.1"
 
 [[projects]]
-  digest = "1:3f53e9e4dfbb664cd62940c9c4b65a2171c66acd0b7621a1a6b8e78513525a52"
+  digest = "1:69b1cc331fca23d702bd72f860c6a647afd0aa9fcbc1d0659b1365e26546dd70"
   name = "github.com/sirupsen/logrus"
   packages = ["."]
   pruneopts = "UT"
-  revision = "ad15b42461921f1fb3529b058c6786c6a45d5162"
-  version = "v1.1.1"
+  revision = "bcd833dfe83d3cebad139e4a29ed79cb2318bf95"
+  version = "v1.2.0"
 
 [[projects]]
   digest = "1:6a4a11ba764a56d2758899ec6f3848d24698d48442ebce85ee7a3f63284526cd"
@@ -156,22 +172,22 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:3f3a05ae0b95893d90b9b3b5afdb79a9b3d96e4e36e099d841ae602e4aca0da8"
+  digest = "1:38f553aff0273ad6f367cb0a0f8b6eecbaef8dc6cb8b50e57b6a81c1d5b1e332"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
   pruneopts = "UT"
-  revision = "b078efbc8099b041569edb8c6ab625cd430e3fce"
+  revision = "eb0de9b17e854e9b1ccd9963efafc79862359959"
 
 [[projects]]
   branch = "master"
-  digest = "1:a5090ea95e2600b2a369df77359c5871948f12bc8f0632db0342f5acc5e30c1d"
+  digest = "1:0c7cb58af944f9690af91474a75371eecfe54c1ce3771a8dc08924430ee785d3"
   name = "golang.org/x/sys"
   packages = [
     "unix",
     "windows",
   ]
   pruneopts = "UT"
-  revision = "d69651ed3497faee15a5363a89578e9991f6d5e2"
+  revision = "4ed8d59d0b35e1e29334a206d1b3f38b1e5dfb31"
 
 [[projects]]
   digest = "1:8029e9743749d4be5bc9f7d42ea1659471767860f0cdc34d37c3111bd308a295"
@@ -189,12 +205,12 @@
   version = "v0.3.0"
 
 [[projects]]
-  digest = "1:342378ac4dcb378a5448dd723f0784ae519383532f5e70ade24132c4c8693202"
+  digest = "1:4d2e5a73dc1500038e504a8d78b986630e3626dc027bc030ba5c75da257cdb96"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
   pruneopts = "UT"
-  revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
-  version = "v2.2.1"
+  revision = "51d6538a90f86fe93ac480b35f37b2be17fef232"
+  version = "v2.2.2"
 
 [solve-meta]
   analyzer-name = "dep"
@@ -202,6 +218,7 @@
   input-imports = [
     "github.com/akio/rosgo/ros",
     "github.com/golang/protobuf/proto",
+    "github.com/google/flatbuffers/go",
     "github.com/gorilla/websocket",
     "github.com/patrickmn/go-cache",
     "github.com/pkg/profile",

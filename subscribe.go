@@ -40,7 +40,7 @@ const (
 var MsgMap = map[ros.MessageType]string{
 	power_msgs.MsgBatteryState: "battery",
 	std_msgs.MsgString:         "string",
-	sensor_msgs.MsgLaserScan:   "rawlaser",
+	sensor_msgs.MsgLaserScan:   "raw_laser",
 }
 
 // SubscriberManager struct.
@@ -138,7 +138,7 @@ func (sm *SubscriberManager) readData(msg ros.Message) {
 
 	case *sensor_msgs.LaserScan:
 		m := msg.(*sensor_msgs.LaserScan)
-		pl.Stream = "/" + sm.ID + "/sensor/rawlaser"
+		pl.Stream = "/" + sm.ID + "/sensor/raw_laser"
 		pl.Data = &messages.PayLoad_LaserScan{
 			&messages.LaserScan{
 				Timestamp:      timeNow,
@@ -253,18 +253,15 @@ func (sm *SubscriberManager) connectToSocket() {
 		sm.Conn.Close()
 	}
 
-	s := sm.getWebsocketURL()
-	u, _ := url.Parse(s)
-
 	token, err := sm.Auth.checkToken()
 	if err != nil {
 		logrus.Fatal(err)
 	}
 
-	sockURL := u.String() + sm.getNewStreamParam(token)
-	logrus.Infof("[Subscribe] Connecting to %s", sockURL)
+	sockURL := sm.getWebsocketURL(token)
+	logrus.Infof("[Subscribe] Connecting to %s", sockURL.String())
 
-	sm.Conn, _, err = websocket.DefaultDialer.Dial(sockURL, nil)
+	sm.Conn, _, err = websocket.DefaultDialer.Dial(sockURL.String(), nil)
 	if err != nil {
 		logrus.Fatal("[Subscribe] Error connecting to websocket:", err)
 	}
@@ -273,20 +270,21 @@ func (sm *SubscriberManager) connectToSocket() {
 }
 
 // getWebsocketURL generates URL to reach stream_server websocket.
-func (sm *SubscriberManager) getWebsocketURL() string {
+func (sm *SubscriberManager) getWebsocketURL(token string) url.URL {
 	host := viper.GetString("streams_server.host")
 	port := viper.GetString("streams_server.port")
 	api := viper.GetString("streams_server.api_uri")
 
-	return "ws://" + host + ":" + port + api + "?" + "id=" + sm.ID
-}
+	sockURL := url.URL{Scheme: "ws", Host: host + ":" + port, Path: api}
+	query := sockURL.Query()
+	query.Set("id", sm.ID)
+	query.Set("token", token)
 
-// getNewStreamParam generates URL params for all the streams.
-func (sm *SubscriberManager) getNewStreamParam(token string) string {
-	var sb bytes.Buffer
 	for _, v := range sm.Streams {
-		sb.WriteString("&streams=/" + sm.ID + "/sensor/" + MsgMap[v])
+		query.Add("streams", "/"+sm.ID+"/sensor/"+MsgMap[v])
 	}
 
-	return sb.String() + "&token=" + token
+	sockURL.RawQuery = query.Encode()
+
+	return sockURL
 }
