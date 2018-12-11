@@ -12,14 +12,18 @@ dep ensure
 ```
 This should install all the dependencies required to run go stream node.
 
-Run the following command to automatically generate GO files for message types from the message definitions
+In addition to above dependencies, we need `gengo` to automatically generate GO files for message types. Use the following commmand to get gengo.
+```
+go get github.com/akio/rosgo/gengo
+```
+Go to your `$GOPATH/src/github.com/akio/rosgo/gengo` and run `go install`. This should add the `gengo` executable to your `$GOPATH/bin`. Now run the following command to automatically generate GO files for message types from the message definitions
 ```
 go generate
 ```
 ### Starting Stream Node
 Now, run the following command to start the stream node server. Be sure to change streams server host address in `application.toml` to wherever your streams server is running if you run across `connection refused` error.
 ```
-go install && go-stream-server
+go install && go-stream-node
 ```
 To add new listeners, following format can be used in `main.go` which will add new stream type to `streams` map. This will add additional listeners to the stream node.
 ```
@@ -41,6 +45,11 @@ For example we can send message of type `std_msgs/String` using the following co
 rostopic pub /string std_msgs/String "data:'Test'"
 ```
 Do note that `std_msgs/String` type data is not supported on streams server. Hence, you will probably see an error on your streams server.
+
+Tests can be run using the following command. Make sure roscore is up and running before running the test.
+```
+go test -test.v=true
+```
 
 ### Configurations
 Changing auth0 credentials and streams server's properties can be done by editing the `application.toml` file in `conf/development` directory.

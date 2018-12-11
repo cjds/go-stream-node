@@ -32,6 +32,11 @@ func (t *_MsgBatteryState) NewMessage() ros.Message {
 	m.ChargeLevel = 0.0
 	m.IsCharging = false
 	m.RemainingTime = ros.Duration{}
+	m.TotalCapacity = 0.0
+	m.CurrentCapacity = 0.0
+	m.BatteryVoltage = 0.0
+	m.SupplyVoltage = 0.0
+	m.ChargerVoltage = 0.0
     return m
 }
 
@@ -50,9 +55,25 @@ bool is_charging
 # When discharging, this is the time until battery is empty.
 # Non-zero values are considered valid.
 duration remaining_time
+
+# Total capacity of battery
+float32 total_capacity
+
+# Current capacity of battery
+float32 current_capacity
+
+# Voltage of battery
+float32 battery_voltage
+
+# Voltage of the supply breaker
+float32 supply_voltage
+
+# Voltage of the charger
+float32 charger_voltage
+
 `,
         "power_msgs/BatteryState",
-        "4b7120fcba08944ca050890d5cbdd68c",
+        "ccaf6ecc0ffe8d97f762d3e343f15d67",
     }
 )
 
@@ -61,6 +82,11 @@ type BatteryState struct {
 	ChargeLevel float32 `rosmsg:"charge_level:float32"`
 	IsCharging bool `rosmsg:"is_charging:bool"`
 	RemainingTime ros.Duration `rosmsg:"remaining_time:duration"`
+	TotalCapacity float32 `rosmsg:"total_capacity:float32"`
+	CurrentCapacity float32 `rosmsg:"current_capacity:float32"`
+	BatteryVoltage float32 `rosmsg:"battery_voltage:float32"`
+	SupplyVoltage float32 `rosmsg:"supply_voltage:float32"`
+	ChargerVoltage float32 `rosmsg:"charger_voltage:float32"`
 }
 
 func (m *BatteryState) Type() ros.MessageType {
@@ -75,6 +101,11 @@ func (m *BatteryState) Serialize(buf *bytes.Buffer) error {
     binary.Write(buf, binary.LittleEndian, m.IsCharging)
     binary.Write(buf, binary.LittleEndian, m.RemainingTime.Sec)
     binary.Write(buf, binary.LittleEndian, m.RemainingTime.NSec)
+    binary.Write(buf, binary.LittleEndian, m.TotalCapacity)
+    binary.Write(buf, binary.LittleEndian, m.CurrentCapacity)
+    binary.Write(buf, binary.LittleEndian, m.BatteryVoltage)
+    binary.Write(buf, binary.LittleEndian, m.SupplyVoltage)
+    binary.Write(buf, binary.LittleEndian, m.ChargerVoltage)
     return err
 }
 
@@ -106,6 +137,21 @@ func (m *BatteryState) Deserialize(buf *bytes.Reader) error {
         if err = binary.Read(buf, binary.LittleEndian, &m.RemainingTime.NSec); err != nil {
             return err
         }
+    }
+    if err = binary.Read(buf, binary.LittleEndian, &m.TotalCapacity); err != nil {
+        return err
+    }
+    if err = binary.Read(buf, binary.LittleEndian, &m.CurrentCapacity); err != nil {
+        return err
+    }
+    if err = binary.Read(buf, binary.LittleEndian, &m.BatteryVoltage); err != nil {
+        return err
+    }
+    if err = binary.Read(buf, binary.LittleEndian, &m.SupplyVoltage); err != nil {
+        return err
+    }
+    if err = binary.Read(buf, binary.LittleEndian, &m.ChargerVoltage); err != nil {
+        return err
     }
     return err
 }

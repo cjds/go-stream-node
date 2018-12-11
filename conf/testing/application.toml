@@ -1,4 +1,4 @@
-version = "development"
+version = "testing"
 
 [auth]
 enabled              = false
@@ -16,6 +16,6 @@ max_retries          = 3
 on_success_wait      = 82800 #seconds
 
 [streams_server]
-host        = "10.100.1.40" #Change to where streams_server is hosted at
+host        = "10.100.1.40"
 port        = 8080
-api_uri     = "/streams/api/v1/producer/protobuf"
+api_uri     = "/streams/api/v1/producer/go-stream"
